@@ -34,7 +34,10 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Final Space Characters</h1>
+        <h1 data-testid="title-content">Final Space Characters</h1>
+        <span data-testid="text-content">
+          You can drag and drop the list below
+        </span>
         <DragDrop data={characters} />
       </header>
     </div>
