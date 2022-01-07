@@ -19,31 +19,29 @@ workflows:
           version: "16.10"
           # If you are using yarn, change the line below from "npm" to "yarn"
           pkg-manager: yarn
-      build:
-        # docker:
-        #   - image: node:11.10.1
 
-        # working_directory: ~/repo
+      # build:
+      #   # docker:
+      #   #   - image: node:11.10.1
 
-        steps: 
-          - checkout 
+      #   # working_directory: ~/repo
 
-          - restore_cache: 
-            keys:
-              - v1-dependencies-{{ checkSum: "package.json" }}
-              # fallback to using the latest cache if no exact match is found
-              - v1-dependencies- 
-          - run: yarn install
-          - run: yarn test
-          - run: yarn build
-          - run: yarn publish
-          - run: yarn run lint
+      #   steps:
+      #     - checkout
 
-          - save_cache:
-            keys:
-              - v1-dependencies-{{ checkSum: "package.json" }}
-              # fallback to using the latest cache if no exact match is found
-              - v1-dependencies-
-          
-          
+      #     - restore_cache:
+      #       keys:
+      #         - v1-dependencies-{{ checkSum: "package.json" }}
+      #         # fallback to using the latest cache if no exact match is found
+      #         - v1-dependencies-
+      #     - run: yarn install
+      #     - run: yarn test
+      #     - run: yarn build
+      #     - run: yarn publish
+      #     - run: yarn run lint
 
+      #     - save_cache:
+      #       keys:
+      #         - v1-dependencies-{{ checkSum: "package.json" }}
+      #         # fallback to using the latest cache if no exact match is found
+      #         - v1-dependencies-
