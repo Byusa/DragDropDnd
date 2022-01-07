@@ -16,6 +16,36 @@ workflows:
           # This is the node version to use for the `cimg/node` tag
           # Relevant tags can be found on the CircleCI Developer Hub
           # https://circleci.com/developer/images/image/cimg/node
-          version: '16.10'
+          version: "16.10"
           # If you are using yarn, change the line below from "npm" to "yarn"
           pkg-manager: yarn
+      build:
+        docker:
+          - image: node:11.10.1
+
+        working_directory: ~/repo
+
+        steps: 
+          - checkout 
+
+          - restore_cache: 
+            keys:
+              - v1-dependencies-{{ checkSum: "package.json" }}
+              # fallback to using the latest cache if no exact match is found
+              - v1-dependencies- 
+          - run: yarn install
+          - run: yarn test
+          - run: yarn build
+          - run: yarn publish
+          - run: yarn run lint
+          - run: yarn run test:coverage
+          - run: yarn run test:coverage:open
+
+          - save_cache:
+            keys:
+              - v1-dependencies-{{ checkSum: "package.json" }}
+              # fallback to using the latest cache if no exact match is found
+              - v1-dependencies-
+          
+          
+
