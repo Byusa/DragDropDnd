@@ -9,39 +9,57 @@ orbs:
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  sample: # This is the name of the workflow, feel free to change it to better match your workflow.
+  sample:# This is the name of the workflow, feel free to change it to better match your workflow.
     # Inside the workflow, you define the jobs you want to run.
-    jobs:
-      - node/test:
-          # This is the node version to use for the `cimg/node` tag
-          # Relevant tags can be found on the CircleCI Developer Hub
-          # https://circleci.com/developer/images/image/cimg/node
-          version: "16.10"
-          # If you are using yarn, change the line below from "npm" to "yarn"
-          pkg-manager: yarn
 
-      build:
-        # docker:
-        #   - image: node:11.10.1
+jobs:
+  test_frontend:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/node:16.5
+    resource_class: medium+
+    steps:
+      - checkout
+      - run: 
+          name: install yarn
+          command: | 
+            curl -o- -L https://yarnpkg.com/install.sh | bash
+            export PATH="$HOME/.yarn/bin:$PATH"
+      - restore_cache: 
+          name: Restoring Cache
+          key: yarndeps-{{ checksum "yarn.lock" }}
+      - run:
+          name: Install yarn dependencies
+          command: | 
+            yarn
+      -save_cache:
+          name: Saving yarn cache
+          key: yarndeps-{{ checksum "yarn.lock" }}
+          paths:
+            - "/node_modules"
+      - run: 
+          name: Build yarn bundle
+          command: |
+            yarn relay
+            yarn build
+      - run: 
+          name: ESLint
+          command: |
+            yarn eslint src --max-warnings 0
+      - run: 
+          name: Prettier
+          command: |
+            yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}' 
+          #to be added (yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}')
+      - run: 
+          name: Frontend Tests
+          command: |
+            yarn run test --maxWorkers=4
+          environment: 
+            NODE_OPTIONS: '--max-old-space-size=4096'
+      - slack/status: 
+        failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
+        fail_only: true
+        only_for_branches: master
 
-        # working_directory: ~/repo
-
-        steps:
-          - checkout
-
-          - restore_cache:
-            keys:
-              - v1-dependencies-{{ checkSum: "package.json" }}
-              # fallback to using the latest cache if no exact match is found
-              - v1-dependencies-
-          - run: yarn install
-          - run: yarn test
-          - run: yarn build
-          - run: yarn publish
-          - run: yarn run lint
-
-      #     - save_cache:
-      #       keys:
-      #         - v1-dependencies-{{ checkSum: "package.json" }}
-      #         # fallback to using the latest cache if no exact match is found
-      #         - v1-dependencies-
+  # test_backend:
