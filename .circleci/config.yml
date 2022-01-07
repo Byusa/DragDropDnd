@@ -6,7 +6,7 @@ orbs:
   aws-ecs: circleci/aws-ecs@2.2.1
   slack: circleci/slack@3.4.2
   aws-parameter-store: circleci/aws-parameter-store@1.0.0
-  jira: circleci/jira@1.0.5 # invokes the Jira orb, making its commands accessible
+  # jira: circleci/jira@1.0.5 # invokes the Jira orb, making its commands accessible
 
 jobs:
   test_frontend:
@@ -35,8 +35,7 @@ jobs:
             - "/node_modules"
       - run:
           name: Build yarn bundle
-          command: |
-            yarn relay
+          command: |         
             yarn build
       - run:
           name: ESLint
@@ -210,8 +209,6 @@ jobs:
           name: Build yarn bundle
           command: |
             source /tmp/parameterstore/PARAMETERSTORESOURCEFILE
-            cd hopper/frontend
-            yarn relay
             REACT_APP_LAUNCH_DARKLY_KEY=$LAUNCH_DARKLY_CLIENT_ID_<<parameters.uppercase_environment>> REACT_APP_RELEASE_VERSION=$CIRCLE_SHA1 REACT_APP_AUTH0_DOMAIN=$DOMAIN_<<parameters.uppercase_environment>> REACT_APP_AUTH0_CLIENT_ID=$CLIENT_ID_<<parameters.uppercase_environment>> REACT_APP_AUDIENCE=$AUDIENCE_<<parameters.uppercase_environment>> yarn build
             sentry-cli releases files $CIRCLE_SHA1 upload-sourcemaps build/static/js --url-prefix '~/static/js'
             rm build/static/js/*.map
@@ -313,9 +310,9 @@ workflows:
     jobs:
       - test_frontend:
           post-steps:
-            - jira/notify:
-                environment_type: development
-                job_type: build
+            # - jira/notify:
+            #     environment_type: development
+            #     job_type: build
       # - test_backend:
       #     post-steps:
       #       - jira/notify:
@@ -325,7 +322,7 @@ workflows:
       # Deploy prod
       - build_nginx:
           uppercase_environment: PROD
-          name: "build_nginx_prod"
+          # name: "build_nginx_prod"
           tags: latest,$CIRCLE_SHA1
           filters:
             branches:
@@ -355,31 +352,31 @@ workflows:
             branches:
               only:
                 - master
-          requires:
-            - build_hopper_prod
-            - build_nginx_prod
+          # requires:
+          #   - build_hopper_prod
+          #   - build_nginx_prod
       - finalize_release:
           name: "finalize-hopper-prod"
           environment: "prod"
           requires:
             - deploy_to_ecs_prod
-          post-steps:
-            - jira/notify:
-                environment_type: production
-                job_type: deployment
+          # post-steps:
+          #   - jira/notify:
+          #       environment_type: production
+          #       job_type: deployment
 
       # Deploy test
-      - build_nginx:
-          uppercase_environment: TEST
-          name: "build_nginx_test"
-          tags: test,$CIRCLE_SHA1-test
-          filters:
-            branches:
-              only:
-                - master
-          requires:
-            - test_frontend
-            # - test_backend
+      # - build_nginx:
+      #     uppercase_environment: TEST
+      #     name: "build_nginx_test"
+      #     tags: test,$CIRCLE_SHA1-test
+      #     filters:
+      #       branches:
+      #         only:
+      #           - master
+      #     requires:
+      #       - test_frontend
+      #       # - test_backend
       - build_hopper:
           name: "build_hopper_test"
           environment: "test"
@@ -403,26 +400,26 @@ workflows:
                 - master
           requires:
             - build_hopper_test
-            - build_nginx_test
+            # - build_nginx_test
       - finalize_release:
           name: "finalize-hopper-test"
           environment: "test"
           requires:
             - deploy_to_ecs_test
-          post-steps:
-            - jira/notify:
-                environment_type: testing
-                job_type: deployment
+          # post-steps:
+          #   - jira/notify:
+          #       environment_type: testing
+          #       job_type: deployment
 
       # Build and deploy DEV
-      - build_nginx:
-          uppercase_environment: DEV
-          name: "build_nginx_dev"
-          tags: dev,$CIRCLE_SHA1-dev
-          filters:
-            branches:
-              only:
-                - dev-test
+      # - build_nginx:
+      #     uppercase_environment: DEV
+      #     name: "build_nginx_dev"
+      #     tags: dev,$CIRCLE_SHA1-dev
+      #     filters:
+      #       branches:
+      #         only:
+      #           - dev-test
       - build_hopper:
           name: "build_hopper_dev"
           environment: "dev"
@@ -438,14 +435,14 @@ workflows:
           security-group-ids: "sg-02264685235cc5ba3"
           requires:
             - build_hopper_dev
-            - build_nginx_dev
+            # - build_nginx_dev
 
       - finalize_release:
           name: "finalize-hopper-dev"
           environment: "dev"
           requires:
             - deploy_to_ecs_dev
-          post-steps:
-            - jira/notify:
-                environment_type: testing
-                job_type: deployment
+          # post-steps:
+          #   - jira/notify:
+          #       environment_type: testing
+          #       job_type: deployment
