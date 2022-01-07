@@ -12,44 +12,44 @@ workflows:
   sample:# This is the name of the workflow, feel free to change it to better match your workflow.
   # Inside the workflow, you define the jobs you want to run.
 
-jobs:
-  test_frontend:
-    working_directory: ~/repo
-    docker:
-      - image: circleci/node:16.5
-    resource_class: medium+
-    steps:
-      # - checkout
-      - run:
-          name: install yarn
-          command: |
-            curl -o- -L https://yarnpkg.com/install.sh | bash
-            export PATH="$HOME/.yarn/bin:$PATH"
-      - restore_cache:
-          name: Restoring Cache
-          key: yarndeps-{{ checksum "yarn.lock" }}
-      - run:
-          name: Install yarn dependencies
-          command: |
-            yarn
-      - save_cache:
-          name: Saving yarn cache
-          key: yarndeps-{{ checksum "yarn.lock" }}
-          paths:
-            - "/node_modules"
-      - run:
-          name: Build yarn bundle
-          command: |
-            yarn relay
-            yarn build
-      - run:
-          name: ESLint
-          command: |
-            yarn eslint src --max-warnings 0
-      - run:
-          name: Prettier
-          command: |
-            yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}'
+# jobs:
+#   test_frontend:
+#     working_directory: ~/repo
+#     docker:
+#       - image: circleci/node:16.5
+#     resource_class: medium+
+#     steps:
+#       # - checkout
+#       - run:
+#           name: install yarn
+#           command: |
+#             curl -o- -L https://yarnpkg.com/install.sh | bash
+#             export PATH="$HOME/.yarn/bin:$PATH"
+#       # - restore_cache:
+#       #     name: Restoring Cache
+#       #     key: yarndeps-{{ checksum "yarn.lock" }}
+#       - run:
+#           name: Install yarn dependencies
+#           command: |
+#             yarn
+#       - save_cache:
+#           name: Saving yarn cache
+#           key: yarndeps-{{ checksum "yarn.lock" }}
+#           paths:
+#             - "/node_modules"
+#       - run:
+#           name: Build yarn bundle
+#           command: |
+#             yarn relay
+#             yarn build
+#       - run:
+#           name: ESLint
+#           command: |
+#             yarn eslint src --max-warnings 0
+#       - run:
+#           name: Prettier
+#           command: |
+#             yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}'
           #to be added (yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}')
       # - run:
       #     name: Frontend Tests
