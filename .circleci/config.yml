@@ -57,9 +57,9 @@ jobs:
             yarn run test --maxWorkers=4
           environment:
             NODE_OPTIONS: "--max-old-space-size=4096"
-      - slack/status:
-        failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
-        fail_only: true
-        only_for_branches: master
+      # - slack/status:
+      #   failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
+      #   fail_only: true
+      #   only_for_branches: master
 
   # test_backend:
