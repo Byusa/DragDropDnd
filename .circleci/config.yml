@@ -10,7 +10,7 @@ orbs:
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
   sample:# This is the name of the workflow, feel free to change it to better match your workflow.
-    # Inside the workflow, you define the jobs you want to run.
+  # Inside the workflow, you define the jobs you want to run.
 
 jobs:
   test_frontend:
@@ -19,45 +19,45 @@ jobs:
       - image: circleci/node:16.5
     resource_class: medium+
     steps:
-      - checkout
-      - run: 
+      # - checkout
+      - run:
           name: install yarn
-          command: | 
+          command: |
             curl -o- -L https://yarnpkg.com/install.sh | bash
             export PATH="$HOME/.yarn/bin:$PATH"
-      - restore_cache: 
+      - restore_cache:
           name: Restoring Cache
           key: yarndeps-{{ checksum "yarn.lock" }}
       - run:
           name: Install yarn dependencies
-          command: | 
+          command: |
             yarn
-      -save_cache:
+      - save_cache:
           name: Saving yarn cache
           key: yarndeps-{{ checksum "yarn.lock" }}
           paths:
             - "/node_modules"
-      - run: 
+      - run:
           name: Build yarn bundle
           command: |
             yarn relay
             yarn build
-      - run: 
+      - run:
           name: ESLint
           command: |
             yarn eslint src --max-warnings 0
-      - run: 
+      - run:
           name: Prettier
           command: |
-            yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}' 
+            yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}'
           #to be added (yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}')
-      - run: 
+      - run:
           name: Frontend Tests
           command: |
             yarn run test --maxWorkers=4
-          environment: 
-            NODE_OPTIONS: '--max-old-space-size=4096'
-      - slack/status: 
+          environment:
+            NODE_OPTIONS: "--max-old-space-size=4096"
+      - slack/status:
         failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
         fail_only: true
         only_for_branches: master
