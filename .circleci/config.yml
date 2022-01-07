@@ -51,12 +51,12 @@ jobs:
           command: |
             yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}'
           #to be added (yarn prettier --check 'src/**/*.{js,jsx,ts,tsx}')
-      - run:
-          name: Frontend Tests
-          command: |
-            yarn run test --maxWorkers=4
-          environment:
-            NODE_OPTIONS: "--max-old-space-size=4096"
+      # - run:
+      #     name: Frontend Tests
+      #     command: |
+      #       yarn run test --maxWorkers=4
+      #     environment:
+      #       NODE_OPTIONS: "--max-old-space-size=4096"
       # - slack/status:
       #   failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
       #   fail_only: true
