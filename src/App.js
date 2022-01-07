@@ -1,5 +1,4 @@
-import React, { useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import React from "react";
 import DragDrop from "./components/DragDrop";
 import "./App.css";
 const finalSpaceCharacters = [
@@ -30,7 +29,7 @@ const finalSpaceCharacters = [
   },
 ];
 function App() {
-  const [characters, updateCharacters] = useState(finalSpaceCharacters);
+  const characters = finalSpaceCharacters;
 
   return (
     <div className="App">
