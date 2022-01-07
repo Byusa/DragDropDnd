@@ -38,8 +38,6 @@ workflows:
           - run: yarn build
           - run: yarn publish
           - run: yarn run lint
-          - run: yarn run test:coverage
-          - run: yarn run test:coverage:open
 
           - save_cache:
             keys:
