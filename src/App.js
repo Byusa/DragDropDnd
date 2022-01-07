@@ -28,7 +28,13 @@ const finalSpaceCharacters = [
     thumb: "/images/quinn.png",
   },
 ];
-function App() {
+
+const sortHandler = () => {
+  const characters = finalSpaceCharacters;
+  characters.sort((a, b) => a.name.localeCompare(b.name));
+  console.log(characters);
+};
+const App = () => {
   const characters = finalSpaceCharacters;
 
   return (
@@ -38,9 +44,10 @@ function App() {
         <span data-testid="text-content">
           You can drag and drop the list below
         </span>
+        <button onClick={sortHandler}>sort</button>
         <DragDrop data={characters} />
       </header>
     </div>
   );
-}
+};
 export default App;
