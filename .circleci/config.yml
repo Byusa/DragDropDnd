@@ -1,448 +1,64 @@
 version: 2.1
-
 orbs:
-  aws-cli: circleci/aws-cli@1.3
-  aws-ecr: circleci/aws-ecr@6.8.2
-  aws-ecs: circleci/aws-ecs@2.2.1
-  slack: circleci/slack@3.4.2
-  aws-parameter-store: circleci/aws-parameter-store@1.0.0
-  # jira: circleci/jira@1.0.5 # invokes the Jira orb, making its commands accessible
+  node: circleci/node@4.7.0
+  heroku: circleci/heroku@1.2.6
 
 jobs:
-  test_frontend:
-    working_directory: ~/repo
+  build_and_test:
     docker:
-      - image: circleci/node:16.5
-    resource_class: medium+
+      - image: cimg/node:17.2.0
     steps:
       - checkout
+      - node/install-packages:
+          pkg-manager: yarn
       - run:
-          name: Install yarn
-          command: |
-            curl -o- -L https://yarnpkg.com/install.sh | bash
-            export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-      # - restore_cache:
-      #     name: Restoring Cache
-      #     key: yarndeps-{{ checksum "/yarn.lock" }}
+          command: yarn test
+          name: Run tests
       - run:
-          name: Install yarn dependencies
-          command: |
-            yarn
-      # - save_cache:
-      #     name: Saving yarn cache
-      #     key: yarndeps-{{ checksum "/yarn.lock" }}
-      #     paths:
-      #       - "/node_modules"
-      - run:
-          name: Build yarn bundle
-          command: |         
-            yarn build
-      - run:
-          name: ESLint
-          command: |
-            yarn eslint src --max-warnings 0
-      - run:
-          name: Prettier
-          command: |
-            yarn prettier --check 'src/**/*.js'
-      - run:
-          name: Frontend Tests
-          command: |
-            yarn run test --maxWorkers=4
-          environment:
-            NODE_OPTIONS: --max_old_space_size=6144
-      - slack/status:
-          failure_message: ":facepalm: $CIRCLE_USERNAME, frontend tests failed on master. $CIRCLE_SHA1 not deployed."
-          fail_only: true
-          only_for_branches: master
-
-  # test_backend:
-  #   working_directory: ~/repo
-  #   docker:
-  #     - image: circleci/python:3.8.7
-  #       environment:
-  #         DATABASE_URL: postgresql://root@localhost/circle_test?sslmode=disable
-  #     - image: circleci/postgres:10.10
-  #       environment:
-  #         POSTGRES_USER: root
-  #         POSTGRES_DB: circle_test
-  #     - image: localstack/localstack
-  #       environment:
-  #         - SERVICES=s3,sqs
-  #         - DEBUG=1
-  #     - image: redis
-  #   steps:
-  #     - checkout
-  #     - run:
-  #         name: Setting Permissions
-  #         command: |
-  #           sudo chown -R circleci:circleci /usr/local/bin
-  #           sudo chown -R circleci:circleci /usr/local/lib/python3.8/site-packages
-  #     - restore_cache:
-  #         keys:
-  #           - deps-{{ checksum "/poetry.lock" }}
-  #     # Let's install the dependencies
-  #     - run:
-  #         name: Install Dependencies
-  #         command: |
-  #           poetry install
-  #     # Save's the specified path as a cache. This is the path Poetry uses to install the dependencies
-  #     # So if you don't install anything new, this folder won't change and the cache will be effective
-  #     - save_cache:
-  #         key: deps-{{ checksum "/poetry.lock" }}
-  #         paths:
-  #           - /home/circleci/.cache/pypoetry/virtualenvs
-  #     - run:
-  #         name: Black
-  #         command: |
-  #           poetry run black --check . --exclude "norvig|frontend|.venv"
-  #     - run:
-  #         name: Flake8
-  #         command: |
-  #           poetry run flake8 .
-  #     - run:
-  #         name: Waiting for Postgres to Be Ready
-  #         command: |
-  #           for i in `seq 1 10`;
-  #           do
-  #             nc -z localhost 5432 && echo Success && exit 0
-  #             echo -n .
-  #             sleep 1
-  #           done
-  #           echo Failed waiting for Postgres && exit 1
-  #     - run:
-  #         name: Check schema
-  #         command: |
-  #           poetry run python manage.py graphql_schema --schema graph_api.schema.schema --out verify.graphql
-  #           echo "If this command fails, you need to run `poetry run python manage.py graphql_schema --schema graph_api.schema.schema --out schema.graphql` to regenerate the graphql schema."
-  #           cmp schema.graphql verify.graphql
-  #     - run:
-  #         name: Django Tests
-  #         command: |
-  #           poetry run pytest -vv
-  #         environment:
-  #           DJANGO_SETTINGS_MODULE: settings.test
-  #           POSTGRES_DB: circle_test
-  #           POSTGRES_USER: root
-  #           POSTGRES_HOST: localhost
-  #           POSTGRES_PORT: 5432
-  #     - store_test_results:
-  #         path: test-results
-  #     - store_artifacts:
-  #         path: test-results
-  #         destination: tr1
-  #     - slack/status:
-  #         failure_message: ":facepalm: $CIRCLE_USERNAME, backend tests failed on master. $CIRCLE_SHA1 not deployed."
-  #         fail_only: true
-  #         only_for_branches: master
-
-  build_hopper:
-    parameters:
-      environment:
-        type: string
-      tags:
-        type: string
-    working_directory: ~/repo/<<parameters.environment>>/
+          command: yarn build
+          name: Build app
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - .
+  deploy: # this can be any name you choose
     docker:
-      - image: circleci/python:3.8.7
+      - image: cimg/node:17.2.0
     steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      - aws-ecr/build-and-push-image:
-          extra-build-args: "--build-arg RELEASE_VERSION=$CIRCLE_SHA1"
-          path: hopper/
-          repo: hopper
-          tag: <<parameters.tags>>
-      - slack/status:
-          failure_message: ":facepalm: $CIRCLE_USERNAME, building Hopper <<parameters.environment>> failed. $CIRCLE_SHA1 not deployed."
-          fail_only: true
-
-  build_nginx:
-    parameters:
-      uppercase_environment:
-        type: string
-      tags:
-        type: string
-    working_directory: ~/repo
-    docker:
-      - image: circleci/python:3.8.7-node
-        environment:
-          SENTRY_ORG: "avalanche-insights"
-          SENTRY_PROJECT: "hopper"
-    steps:
-      - checkout
-      - setup_remote_docker:
-          docker_layer_caching: true
-      # Puts parameters into: /tmp/parameterstore/PARAMETERSTORESOURCEFILE
-      - aws-parameter-store/load:
-          filter: "Key='Name',Values='AUDIENCE_<<parameters.uppercase_environment>>','DOMAIN_<<parameters.uppercase_environment>>','CLIENT_ID_<<parameters.uppercase_environment>>','LAUNCH_DARKLY_CLIENT_ID_<<parameters.uppercase_environment>>'"
-      - run:
-          name: cat env vars
-          command: |
-            cat /tmp/parameterstore/PARAMETERSTORESOURCEFILE
-      - run:
-          name: Install yarn
-          command: |
-            curl -o- -L https://yarnpkg.com/install.sh | bash
-            export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
-      - restore_cache:
-          name: Restoring Cache
-          key: yarndeps-{{ checksum "hopper/frontend/yarn.lock" }}
-      - run:
-          name: Install yarn dependencies
-          command: |
-            cd hopper/frontend
-            yarn
-      - run:
-          name: Setting up Sentry CLI
-          command: |
-            curl -sL https://sentry.io/get-cli/ | bash
-            # Assumes you're in a git repository
-            RELEASE_VERSION=$(sentry-cli releases propose-version)
-            # Create a release
-            sentry-cli releases new -p hopper $CIRCLE_SHA1
-            # Associate commits with the release
-            sentry-cli releases set-commits --auto $CIRCLE_SHA1
-      ## Build Image
-      - run:
-          name: Build yarn bundle
-          command: |
-            source /tmp/parameterstore/PARAMETERSTORESOURCEFILE
-            REACT_APP_LAUNCH_DARKLY_KEY=$LAUNCH_DARKLY_CLIENT_ID_<<parameters.uppercase_environment>> REACT_APP_RELEASE_VERSION=$CIRCLE_SHA1 REACT_APP_AUTH0_DOMAIN=$DOMAIN_<<parameters.uppercase_environment>> REACT_APP_AUTH0_CLIENT_ID=$CLIENT_ID_<<parameters.uppercase_environment>> REACT_APP_AUDIENCE=$AUDIENCE_<<parameters.uppercase_environment>> yarn build
-            sentry-cli releases files $CIRCLE_SHA1 upload-sourcemaps build/static/js --url-prefix '~/static/js'
-            rm build/static/js/*.map
-            cp -r build/ ../../nginx/
-      - aws-ecr/build-and-push-image:
-          path: nginx/
-          repo: hopper-nginx
-          tag: <<parameters.tags>>
-      - slack/status:
-          failure_message: ":facepalm: $CIRCLE_USERNAME, building NGINX <<parameters.uppercase_environment>> failed. $CIRCLE_SHA1 <<parameters.uppercase_environment>> not deployed."
-          fail_only: true
-
-  finalize_release:
-    parameters:
-      environment:
-        type: string
-    working_directory: ~/repo
-    docker:
-      - image: circleci/node:14.5
-        environment:
-          SENTRY_ORG: "avalanche-insights"
-          SENTRY_PROJECT: "hopper"
-    steps:
-      - run:
-          name: Setting up Sentry CLI
-          command: |
-            curl -sL https://sentry.io/get-cli/ | bash
-            sentry-cli releases finalize $CIRCLE_SHA1
-      - slack/status:
-          success_message: ":success_kid: $CIRCLE_USERNAME, the << parameters.environment >> build has passed. $CIRCLE_SHA1 deployed."
-
-  chromatic-deployment:
-    docker:
-      - image: circleci/node:12
-    working_directory: ~/repo
-    steps:
-      - checkout
-      - restore_cache:
-          name: Restoring Cache
-          key: yarndeps-{{ checksum "hopper/frontend/yarn.lock" }}
-      - run:
-          name: Install yarn dependencies
-          command: |
-            cd hopper/frontend
-            yarn install
-      - run:
-          name: Launch chromatic
-          command: |
-            cd hopper/frontend
-            yarn chromatic --project-token=${CHROMATIC_PROJECT_TOKEN} --exit-zero-on-changes
-  deploy_to_ecs:
-    docker:
-      - image: "cimg/python:3.9.1"
-    parameters:
-      environment:
-        type: string
-      subnet-ids:
-        type: string
-      security-group-ids:
-        type: string
-    steps:
-      - aws-cli/setup:
-          aws-access-key-id: AWS_SECRET_ACCESS_KEY
-          aws-region: AWS_DEFAULT_REGION
-          aws-secret-access-key: AWS_DEFAULT_REGION
-      - aws-ecs/update-service:
-          family: hopper-<< parameters.environment >>
-          cluster-name: hopper-<< parameters.environment >>
-          service-name: hopper-service-<< parameters.environment >>
-          force-new-deployment: true
-      - aws-ecs/update-service:
-          family: hopper-nginx-<< parameters.environment >>
-          cluster-name: hopper-<< parameters.environment >>
-          service-name: hopper-nginx-service-<< parameters.environment >>
-          force-new-deployment: true
-      - aws-ecs/update-service:
-          family: hopper-celery-long-<< parameters.environment >>
-          cluster-name: hopper-<< parameters.environment >>
-          service-name: hopper-celery-long-<< parameters.environment >>
-          force-new-deployment: true
-      - aws-ecs/update-service:
-          family: hopper-celery-default-<< parameters.environment >>
-          cluster-name: hopper-<< parameters.environment >>
-          service-name: hopper-celery-default-<< parameters.environment >>
-          force-new-deployment: true
-      - aws-ecs/run-task:
-          platform-version: 1.4.0
-          cluster: hopper-<< parameters.environment >>
-          task-definition: hopper-migration-<< parameters.environment >>
-          subnet-ids: << parameters.subnet-ids >>
-          security-group-ids: << parameters.security-group-ids >>
+      - attach_workspace:
+          at: ~/project
+      - heroku/deploy-via-git:
+          force: true # force push when pushing to the heroku remote, see: https://devcenter.heroku.com/articles/git
 
 workflows:
-  version: 2
-  chromatic-deploy:
+  on_commit:
     jobs:
-      - chromatic-deployment
-  test-and-deploy:
-    jobs:
-      - test_frontend:
-          post-steps:
-            # - jira/notify:
-            #     environment_type: development
-            #     job_type: build
-      # - test_backend:
-      #     post-steps:
-      #       - jira/notify:
-      #           environment_type: development
-      #           job_type: build
-
-      # Deploy prod
-      - build_nginx:
-          uppercase_environment: PROD
-          # name: "build_nginx_prod"
-          tags: latest,$CIRCLE_SHA1
-          filters:
-            branches:
-              only:
-                - master
-          requires:
-            - test_frontend
-            # - test_backend
-      - build_hopper:
-          name: "build_hopper_prod"
-          environment: "prod"
-          tags: latest,$CIRCLE_SHA1
-          filters:
-            branches:
-              only:
-                - master
-          requires:
-            - test_frontend
-            # - test_backend
-
-      - deploy_to_ecs:
-          environment: "prod"
-          name: "deploy_to_ecs_prod"
-          subnet-ids: "subnet-05c91cdbfc1a88342, subnet-0ddb89b4d904996f2"
-          security-group-ids: "sg-0c6edc9b3f9c82016"
-          filters:
-            branches:
-              only:
-                - master
-          # requires:
-          #   - build_hopper_prod
-          #   - build_nginx_prod
-      - finalize_release:
-          name: "finalize-hopper-prod"
-          environment: "prod"
-          requires:
-            - deploy_to_ecs_prod
-          # post-steps:
-          #   - jira/notify:
-          #       environment_type: production
-          #       job_type: deployment
-
-      # Deploy test
-      # - build_nginx:
-      #     uppercase_environment: TEST
-      #     name: "build_nginx_test"
-      #     tags: test,$CIRCLE_SHA1-test
-      #     filters:
-      #       branches:
-      #         only:
-      #           - master
+      - build_and_test
+      # Follow instructions here to authenticate git for Heroku: https://devcenter.heroku.com/articles/git#http-git-authentication
+      # The following code may be uncommented, onnce HEROKU_API_KEY & HEROKU_APP_NAME environemnt variables are present
+      # Read more: https://circleci.com/docs/2.0/env-vars/
+      # - deploy:
       #     requires:
-      #       - test_frontend
-      #       # - test_backend
-      - build_hopper:
-          name: "build_hopper_test"
-          environment: "test"
-          tags: test,$CIRCLE_SHA1-test
-          filters:
-            branches:
-              only:
-                - master
-          requires:
-            - test_frontend
-            # - test_backend
-
-      - deploy_to_ecs:
-          environment: "test"
-          name: "deploy_to_ecs_test"
-          subnet-ids: "subnet-08def85f7c73f0708, subnet-091a5ab5620d98630"
-          security-group-ids: "sg-08205e29e233e7983"
-          filters:
-            branches:
-              only:
-                - master
-          requires:
-            - build_hopper_test
-            # - build_nginx_test
-      - finalize_release:
-          name: "finalize-hopper-test"
-          environment: "test"
-          requires:
-            - deploy_to_ecs_test
-          # post-steps:
-          #   - jira/notify:
-          #       environment_type: testing
-          #       job_type: deployment
-
-      # Build and deploy DEV
-      # - build_nginx:
-      #     uppercase_environment: DEV
-      #     name: "build_nginx_dev"
-      #     tags: dev,$CIRCLE_SHA1-dev
+      #       - build_and_test # only deploy if the build_and_test job has completed
       #     filters:
       #       branches:
-      #         only:
-      #           - dev-test
-      - build_hopper:
-          name: "build_hopper_dev"
-          environment: "dev"
-          tags: dev,$CIRCLE_SHA1-dev
+      #         only: master # only deploy when on main/master
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
           filters:
             branches:
               only:
-                - dev-test
-      - deploy_to_ecs:
-          environment: "dev"
-          name: "deploy_to_ecs_dev"
-          subnet-ids: "subnet-068def0ecebe25d22, subnet-0f6b81ae8a25d56b2"
-          security-group-ids: "sg-02264685235cc5ba3"
-          requires:
-            - build_hopper_dev
-            # - build_nginx_dev
-
-      - finalize_release:
-          name: "finalize-hopper-dev"
-          environment: "dev"
-          requires:
-            - deploy_to_ecs_dev
-          # post-steps:
-          #   - jira/notify:
-          #       environment_type: testing
-          #       job_type: deployment
+                - master
+    jobs:
+      - build_and_test
+      # Follow instructions here to authenticate git for Heroku: https://devcenter.heroku.com/articles/git#http-git-authentication
+      # The following code may be uncommented, onnce HEROKU_API_KEY & HEROKU_APP_NAME environemnt variables are present
+      # Read more: https://circleci.com/docs/2.0/env-vars/
+      # - deploy:
+      #     requires:
+      #       - build_and_test # only deploy if the build_and_test job has completed
+      #     filters:
+      #       branches:
+      #         only: master # only deploy when on main/master
